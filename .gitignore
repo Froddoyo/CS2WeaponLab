@@ -10,24 +10,63 @@ publish/
 .vscode/
 TestResults/
 
-# Python / Blender
+# Python
 __pycache__/
 *.pyc
+
+# ---- This repository is public: no game or third-party assets, ever. ----
+# Valve's files, anything extracted or compiled from them, and other people's
+# models, textures and sounds stay out. build/hooks/pre-commit refuses them too,
+# even when force-added.
+
+# Compiled Source 2 resources all end in _c (models, materials, textures, sounds,
+# particles, maps, clips, graphs, skeletons, vdata ...), and the game's archives.
+*_c
+*.vpk
+# Source 2 source files.
+*.vmdl
+*.vmat
+*.vtex
+*.vpcf
+*.vmap
+*.vsnd
+*.vsndevts
+*.vnmclip
+*.vnmgraph
+*.vnmskel
+*.vdata
+# Sounds.
+*.wav
+*.mp3
+*.ogg
+*.flac
+# Models and scenes (a sandbox's .blend holds game poses and meshes).
+*.blend
 *.blend1
 *.blend2
-
-# Game-derived data must never be committed.
-*.vpk
-*.vnmclip_c
-*.vnmgraph_c
-*.vnmskel_c
-*.vdata_c
-*.vsnd_c
-*.vsndevts_c
-*.vmdl_c
+*.fbx
+*.dmx
+*.smd
+*.obj
 *.glb
+*.gltf
+# Textures and images. Only the app's own icons are allowed; screenshots for the
+# README go in docs/.
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.dds
+*.psd
+*.exr
+!/weapon_lab_icon_1024.png
+!/docs/**
+# Weapon Lab's own pose files (decoded game animation).
 *.json.gz
 
-# Default sandbox workspace when running from the repo: game-derived, never commit.
+# Sandbox workspace when running from the repo: game-derived, never commit.
 /workspace/
 workspaces/
+
+# Hand-off folders between PCs held game files once (2026-10-31); never again.
+.claude/handoff/

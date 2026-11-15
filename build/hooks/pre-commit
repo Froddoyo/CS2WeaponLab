@@ -1,0 +1,37 @@
+#!/bin/sh
+# Weapon Lab is a public repository: refuse any commit that adds files that look
+# like game or third-party assets (Valve's files, anything extracted or compiled
+# from them, other people's models, textures and sounds), even force-added ones.
+#
+# Each clone turns this on once:   git config core.hooksPath build/hooks
+# Never skip it with --no-verify.
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# Compiled Source 2 resources (all end in _c), archives, Source 2 sources, sounds,
+# models and scenes, textures, and Weapon Lab's decoded pose files.
+assets='(_c|\.(vpk|vmdl|vmat|vtex|vpcf|vmap|vsnd|vsndevts|vnmclip|vnmgraph|vnmskel|vdata|wav|mp3|ogg|flac|blend[0-9]*|fbx|dmx|smd|obj|glb|gltf|tga|dds|psd|exr|json\.gz))$'
+# Images are only allowed as the app icon and in docs/ (screenshots for the README).
+images='\.(png|jpe?g|gif|bmp|webp)$'
+allowed_images='^(weapon_lab_icon_1024\.png|docs/.*)$'
+# Folders that hold game-derived data.
+folders='^(workspace|workspaces|publish|\.claude/handoff|\.claude/scratch)/'
+
+blocked=$(
+    {
+        printf '%s\n' "$staged" | grep -iE "$assets"
+        printf '%s\n' "$staged" | grep -iE "$images" | grep -vE "$allowed_images"
+        printf '%s\n' "$staged" | grep -E "$folders"
+    } | sort -u
+)
+
+if [ -n "$blocked" ]; then
+    echo "Weapon Lab is public: this commit has files that look like game or third-party assets:" >&2
+    printf '%s\n' "$blocked" | sed 's/^/  /' >&2
+    echo "Unstage them with: git restore --staged <file>" >&2
+    echo "Valve's files and anything made from them never go in this repository." >&2
+    exit 1
+fi
+
+exit 0

@@ -1,0 +1,4 @@
+# Disposable agent work: probe scripts, logs, test runs, temporary exports.
+scratch/
+# Local Claude Code settings that are personal to this machine.
+settings.local.json
