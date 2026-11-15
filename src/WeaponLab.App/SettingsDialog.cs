@@ -107,6 +107,17 @@ public static class SettingsDialog
         return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
     }
 
+    private static async Task<string?> PickBlenderAsync(Window owner)
+    {
+        var picked = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Choose Blender executable",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Blender executable") { Patterns = ["blender.exe"] }],
+        });
+        return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
+
     private static TextBlock Header(string text) => new() { Text = text, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 6, 0, 0) };
 
     private static TextBlock Note(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap, MaxWidth = 560, FontSize = 11, Opacity = 0.75 };

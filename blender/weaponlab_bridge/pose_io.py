@@ -222,7 +222,7 @@ def same_rest(new_bone, old_bone):
 def copy_curve(bag, curve, group):
     """A copy of an F-Curve's keys (positions, handles, interpolation, easing) in another channelbag."""
     count = len(curve.keyframe_points)
-    copy = bag.fcurves.new(curve.data_path, index=curve.array_index, group_name=group)
+    copy = new_curve(bag, curve.data_path, curve.array_index, group)
     copy.keyframe_points.add(count)
 
     def pairs(name):

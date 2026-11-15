@@ -34,8 +34,13 @@ public static partial class BlenderLocator
             .FirstOrDefault();
     }
 
-    public static IEnumerable<string> Candidates()
+    public static IEnumerable<string> Candidates(string? preferredExecutable = null)
     {
+        if (!string.IsNullOrWhiteSpace(preferredExecutable))
+        {
+            yield return preferredExecutable.Trim('"');
+        }
+
         var configured = Environment.GetEnvironmentVariable("WEAPONLAB_BLENDER");
         if (!string.IsNullOrWhiteSpace(configured))
         {

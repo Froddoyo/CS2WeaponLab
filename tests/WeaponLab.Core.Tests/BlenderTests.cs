@@ -37,6 +37,14 @@ public sealed class BlenderTests : IDisposable
         Assert.Null(BlenderLocator.ParseVersion("other.exe", "Usage: other [options]"));
     }
 
+    [Fact]
+    public void UserSelectedBlenderIsTheFirstCandidate()
+    {
+        const string selected = @"C:\Blender 4.4\blender.exe";
+
+        Assert.Equal(selected, BlenderLocator.Candidates(selected).First());
+    }
+
     [Theory]
     [InlineData("rifle_ak", "AK-47")]
     [InlineData("_default_pistol", "USP-S (default pistol)")]
