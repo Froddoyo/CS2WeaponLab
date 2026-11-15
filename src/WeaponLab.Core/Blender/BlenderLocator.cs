@@ -24,7 +24,16 @@ public static partial class BlenderLocator
 
     public static BlenderInstall? Locate(string? preferredExecutable = null)
     {
-        return Candidates(preferredExecutable)
+        // A path chosen in Settings is deliberate: use it even when a newer Blender is installed.
+        if (!string.IsNullOrWhiteSpace(preferredExecutable)
+            && Probe(preferredExecutable.Trim('"')) is { } preferred
+            && preferred.Version >= Minimum)
+        {
+            return preferred;
+        }
+
+        // If the saved executable is missing or unsupported, fall back to automatic discovery.
+        return Candidates()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(File.Exists)
             .Select(Probe)
