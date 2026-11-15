@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WeaponLab.App/WeaponLab.App.csproj" />
+    <Project Path="src/WeaponLab.Cli/WeaponLab.Cli.csproj" />
+    <Project Path="src/WeaponLab.Core/WeaponLab.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WeaponLab.Core.Tests/WeaponLab.Core.Tests.csproj" />
+  </Folder>
+</Solution>

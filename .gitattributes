@@ -1,0 +1,14 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Windows-only scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets. Move these to Git LFS if the repo ever ships any.
+*.png binary
+*.ico binary
+*.blend binary
+*.dll binary
+*.exe binary

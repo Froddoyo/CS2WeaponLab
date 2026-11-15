@@ -1,0 +1,33 @@
+# Build output
+bin/
+obj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+.vscode/
+TestResults/
+
+# Python / Blender
+__pycache__/
+*.pyc
+*.blend1
+*.blend2
+
+# Game-derived data must never be committed.
+*.vpk
+*.vnmclip_c
+*.vnmgraph_c
+*.vnmskel_c
+*.vdata_c
+*.vsnd_c
+*.vsndevts_c
+*.vmdl_c
+*.glb
+*.json.gz
+
+# Default sandbox workspace when running from the repo: game-derived, never commit.
+/workspace/
+workspaces/

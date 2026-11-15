@@ -1,0 +1,152 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="WeaponLab.App.App"
+             RequestedThemeVariant="Dark">
+  <!-- Dense, dark tool styling modelled on Hammer 5 Tools. -->
+  <Application.Resources>
+    <SolidColorBrush x:Key="WindowBrush" Color="#1E1E1E" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#252526" />
+    <SolidColorBrush x:Key="PanelHeaderBrush" Color="#2D2D30" />
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#3C3C3C" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#9A9A9A" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#3E6FB3" />
+    <SolidColorBrush x:Key="RowAltBrush" Color="#2A2A2C" />
+    <!-- Outliner status: yellow = edited in the profile but not in the addon, green = addon matches. -->
+    <SolidColorBrush x:Key="NeedsApplyBrush" Color="#E3C14F" />
+    <SolidColorBrush x:Key="AppliedBrush" Color="#6BCB77" />
+    <SolidColorBrush x:Key="ElsewhereBrush" Color="#7FB8FF" />
+    <SolidColorBrush x:Key="PendingElsewhereBrush" Color="#4FD1C5" />
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme DensityStyle="Compact" />
+
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{StaticResource WindowBrush}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- Panels -->
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.panelHeader">
+      <Setter Property="Background" Value="{StaticResource PanelHeaderBrush}" />
+      <Setter Property="Padding" Value="6,3" />
+    </Style>
+    <Style Selector="TextBlock.panelTitle">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="#C8C8C8" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.groupHeader">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="4,6,0,2" />
+    </Style>
+    <Style Selector="TextBlock.columnHeader">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+    </Style>
+
+    <!-- Compact inputs -->
+    <Style Selector="TextBox.filter">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Padding" Value="5,2" />
+      <Setter Property="Margin" Value="4" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Padding" Value="10,2" />
+      <Setter Property="CornerRadius" Value="2" />
+    </Style>
+    <!-- The practical next step glows: Connect before connecting, Create sandbox, Build .blend… -->
+    <Style Selector="Button.suggested:not(:disabled)">
+      <Setter Property="BorderBrush" Value="#5A9BFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="White" />
+      <Style.Animations>
+        <Animation Duration="0:0:1.4" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="Background" Value="#24344D" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Background" Value="#3F78C9" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+
+    <!-- Edited spots in the graph editor breathe: a slow pulse of their glow. -->
+    <Style Selector="Border.glowPulse">
+      <Style.Animations>
+        <Animation Duration="0:0:1.8" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0.35" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="1" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="Path.glowPulse">
+      <Style.Animations>
+        <Animation Duration="0:0:1.8" IterationCount="Infinite" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0.1" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="0.5" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+
+    <Style Selector="Button.danger:not(:disabled)">
+      <Setter Property="Background" Value="#7A2E2E" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="ComboBox">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="MinHeight" Value="22" />
+    </Style>
+
+    <!-- Dense lists and trees -->
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="MinHeight" Value="20" />
+    </Style>
+    <Style Selector="TreeView">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="20" />
+    </Style>
+
+    <!-- Tool tab strip -->
+    <Style Selector="TabStrip.tools TabStripItem">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="26" />
+      <Setter Property="Padding" Value="12,3" />
+    </Style>
+    <Style Selector="TabStrip.views TabStripItem">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Padding" Value="10,2" />
+    </Style>
+
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{StaticResource WindowBrush}" />
+    </Style>
+  </Application.Styles>
+</Application>

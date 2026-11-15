@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>WeaponLab.Cli</RootNamespace>
+    <AssemblyName>weaponlab</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WeaponLab.Core\WeaponLab.Core.csproj" />
+  </ItemGroup>
+</Project>

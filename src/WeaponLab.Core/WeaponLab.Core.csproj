@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>WeaponLab.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ValveResourceFormat" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WeaponLab.Core.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Blender scripts ship next to the app; BlendBuilder runs them from there. -->
+    <None Include="..\..\blender\weaponlab_bridge\*.py" Link="blender\weaponlab_bridge\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

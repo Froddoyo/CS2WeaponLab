@@ -1,0 +1,761 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="using:WeaponLab.App"
+        xmlns:game="using:WeaponLab.Core.Game"
+        xmlns:blender="using:WeaponLab.Core.Blender"
+        x:Class="WeaponLab.App.MainWindow"
+        Title="CS2 Weapon Lab"
+        Icon="avares://CS2WeaponLab/Assets/app.ico"
+        Width="1500" Height="880" MinWidth="1100" MinHeight="600">
+  <DockPanel>
+    <!-- Tool tabs (everything follows the weapon selected in the outliner) and the profile bar -->
+    <Border DockPanel.Dock="Top" Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="*,Auto">
+        <TabStrip x:Name="ToolTabs" Classes="tools" SelectedIndex="0" SelectionChanged="OnToolChanged">
+          <TabStripItem Content="Animations" ToolTip.Tip="Clips, events and bone tracks of the selected weapon; Blender build and export" />
+          <TabStripItem Content="Anim Events" ToolTip.Tip="Every event in the selected weapon's clips (sounds, particles, gameplay, material) with their timing; edit them here" />
+          <TabStripItem Content="Graph" ToolTip.Tip="The animation graphs that play the selected weapon's clips" />
+          <TabStripItem Content="VData" ToolTip.Tip="Every weapon's properties: damage, recoil, speed… written to the addon's weapons.vdata" />
+          <TabStripItem Content="Deliver" ToolTip.Tip="Push the profile's pending work into the addon, with backups and undo" />
+        </TabStrip>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="8,3" VerticalAlignment="Center">
+          <TextBlock x:Name="PendingText" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <TextBlock Classes="muted" VerticalAlignment="Center" Text="Profile" />
+          <ComboBox x:Name="ProfileCombo" Width="170" SelectionChanged="OnProfileChanged"
+                    ToolTip.Tip="Your local workspace: its Blender files, exports and edits that are not pushed to an addon yet. Applying pushes them into the addon picked on the right." />
+          <Button x:Name="ProfileMenuButton" Content="…" Padding="8,0" ToolTip.Tip="New, rename or delete a profile">
+            <Button.Flyout>
+              <MenuFlyout>
+                <MenuItem Header="New profile…" Click="OnNewProfileClicked" />
+                <MenuItem Header="Rename profile…" Click="OnRenameProfileClicked" />
+                <MenuItem Header="Delete profile…" Click="OnDeleteProfileClicked" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+          <TextBlock Classes="muted" VerticalAlignment="Center" Text="Addon" Margin="8,0,0,0" />
+          <ComboBox x:Name="AddonCombo" Width="220" IsEnabled="False" PlaceholderText="Connect first" SelectionChanged="OnAddonChanged"
+                    ToolTip.Tip="The addon: the live state in the game. Green in the outliner is what it already has; applying pushes the profile's pending work into it.">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="game:AddonInfo">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button x:Name="SettingsButton" Content="Settings…" Margin="8,0,0,0" Click="OnSettingsClicked" ToolTip.Tip="Where your workspace (profiles) and new .blend files live" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Background="{StaticResource PanelHeaderBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,1,0,0" Padding="4,3">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+        <Button x:Name="ConnectButton" Grid.Column="0" Content="Connect" Click="OnConnectClicked" ToolTip.Tip="Find CS2 through Steam" />
+        <Button x:Name="BrowseButton" Grid.Column="1" Margin="4,0,0,0" Content="Browse…" Click="OnBrowseClicked" ToolTip.Tip="Choose the CS2 install folder" />
+        <TextBlock x:Name="StatusText" Grid.Column="2" Margin="10,0" VerticalAlignment="Center" Text="Ready" TextTrimming="CharacterEllipsis" />
+        <TextBlock x:Name="BlenderText" Grid.Column="3" Margin="10,0" VerticalAlignment="Center" Classes="muted" Text="Looking for Blender…" />
+        <TextBlock x:Name="GameText" Grid.Column="4" Margin="10,0" VerticalAlignment="Center" Classes="muted" Text="Not connected" />
+      </Grid>
+    </Border>
+
+    <Grid x:Name="MainColumns" ColumnDefinitions="260,4,*,4,290" Margin="4">
+      <!-- Outliner (hidden on the VData tab) -->
+      <Border x:Name="OutlinerPanel" Grid.Column="0" Classes="panel">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Classes="panelHeader">
+            <TextBlock Classes="panelTitle" Text="Outliner" />
+          </Border>
+          <TextBlock x:Name="OutlinerDescription" DockPanel.Dock="Top" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="8,4,8,2" />
+          <TextBox x:Name="FilterBox" DockPanel.Dock="Top" Classes="filter" PlaceholderText="Filter weapons and clips…" IsEnabled="False" TextChanged="OnFilterChanged" />
+          <StackPanel DockPanel.Dock="Bottom" Margin="6,4" Spacing="2">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Ellipse Width="8" Height="8" Fill="{StaticResource NeedsApplyBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="muted" FontSize="10" Text="Changed, not in the addon yet (for this tab)" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Ellipse Width="8" Height="8" Fill="{StaticResource AppliedBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="muted" FontSize="10" Text="In the addon (incl. the addon's own work)" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Ellipse Width="8" Height="8" Fill="{StaticResource ElsewhereBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="muted" FontSize="10" Text="Graph changed in the addon for another weapon" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Ellipse Width="8" Height="8" Fill="{StaticResource PendingElsewhereBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="muted" FontSize="10" Text="Graph changes on the next push for another weapon" />
+            </StackPanel>
+          </StackPanel>
+          <TreeView x:Name="ExplorerTree" SelectionChanged="OnExplorerSelected">
+            <TreeView.Styles>
+              <Style Selector="TreeViewItem" x:DataType="app:ExplorerNode">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+              </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate x:DataType="app:ExplorerNode" ItemsSource="{Binding Children}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ToolTip.Tip="{Binding StatusTip}">
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Revert to addon default…" Click="OnRevertMenuClicked" IsVisible="{Binding IsPending}"
+                                ToolTip.Tip="Throw away the work here the addon does not have yet, so it matches the addon again (yellow → green). The addon and the .blend are not changed; sandbox files go to a backup." />
+                      <MenuItem Header="Add third-person clips" Click="OnAddThirdPersonMenuClicked" IsVisible="{Binding IsThirdPersonRow}"
+                                ToolTip.Tip="Add the weapon's third-person clips to a sandbox made before 0.26; then Build .blend with Keep my animation" />
+                      <MenuItem Header="Open in Anim Events" Click="OnOpenInAnimEventsMenuClicked" IsVisible="{Binding IsFirstPersonClip}" />
+                      <MenuItem Header="Open in Animations" Click="OnOpenInAnimationsMenuClicked" IsVisible="{Binding IsClipRow}" />
+                      <MenuItem Header="Open in Graphs" Click="OnOpenInGraphsMenuClicked" IsVisible="{Binding IsGraphRow}" />
+                      <MenuItem Header="Open in VData" Click="OnOpenInVDataMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Open in Deliver" Click="OnOpenInDeliverMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Checks…" Click="OnChecksMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Variations…" Click="OnVariationsMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Show the skeleton" Click="OnShowSkeletonMenuClicked" IsVisible="{Binding IsSkeletonRow}" />
+                      <MenuItem Header="Open .blend in Blender" Click="OnOpenBlendMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Show .blend in Explorer" Click="OnShowBlendMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Move .blend…" Click="OnMoveBlendMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Show sandbox folder" Click="OnShowSandboxMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                      <MenuItem Header="Copy name" Click="OnCopyNameMenuClicked" IsVisible="{Binding HasName}" />
+                      <MenuItem Header="Export animation…" Click="OnExportAnimationMenuClicked" IsVisible="{Binding IsClipRow}"
+                                ToolTip.Tip="Write this clip's animation to a file: compiled (.vnmclip_c), baked poses (.json.gz), Blender keys (.blend) or FBX" />
+                      <MenuItem Header="Import animation…" Click="OnImportAnimationMenuClicked" IsVisible="{Binding IsClipRow}"
+                                ToolTip.Tip="Put an animation file on this clip, bone by bone (by name and parent); it becomes the clip's export, its events stay" />
+                      <MenuItem Header="Copy asset path" Click="OnCopyAssetPathMenuClicked" IsVisible="{Binding HasAssetPath}"
+                                ToolTip.Tip="The full resource path without _c, e.g. for ModelDoc's NmSkeletonReference Source File" />
+                      <MenuItem Header="Collapse all" Click="OnCollapseAllMenuClicked" />
+                      <Separator IsVisible="{Binding CanSetToStock}" />
+                      <MenuItem Header="Set to CS2 default…" Click="OnResetWeaponMenuClicked" IsVisible="{Binding IsWeaponRow}"
+                                ToolTip.Tip="The whole weapon: every clip, graph edit and setting goes back to CS2's on the next push." />
+                      <MenuItem Header="Set to CS2 default…" Click="OnResetClipMenuClicked" IsVisible="{Binding IsFirstPersonClip}"
+                                ToolTip.Tip="Only this animation: it plays CS2's clip again after the next push. Your .blend keeps its keys." />
+                      <MenuItem Header="Set skeleton to CS2 default…" Click="OnResetSkeletonMenuClicked" IsVisible="{Binding IsSkeletonRow}"
+                                ToolTip.Tip="Back to CS2's skeleton: the clips and your exports move back onto it (the extra bones' motion is dropped). Backed up first." />
+                      <MenuItem Header="Set to CS2 default…" Click="OnResetGraphMenuClicked" IsVisible="{Binding IsGraphRow}"
+                                ToolTip.Tip="The weapon's own graphs are rebuilt from CS2's on the next push (this profile's clips stay routed); shared graphs only lose this profile's pending edits." />
+                    </ContextMenu>
+                  </Grid.ContextMenu>
+                  <Ellipse Grid.Column="0" Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center" IsVisible="{Binding HasStatus}"
+                           Fill="{Binding State, Converter={x:Static app:Converters.StateBrush}}" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                               FontWeight="{Binding IsCategory, Converter={x:Static app:Converters.BoldWhenTrue}}"
+                               Foreground="{Binding State, Converter={x:Static app:Converters.StateTextBrush}}" />
+                    <!-- Blender mark: the weapon's sandbox has a .blend (Animations tab). -->
+                    <Viewbox Width="14" Height="14" Margin="7,0,0,0" VerticalAlignment="Center" IsVisible="{Binding HasBlend}"
+                             ToolTip.Tip="Has a Blender file (.blend) in its sandbox">
+                      <Canvas Width="16" Height="16">
+                        <Path Fill="#E87D0D" Data="M1,7 L7,2.2 L8.4,3.6 L5.6,6 L8.5,6 C11.8,6 14.6,8.4 14.6,11.3 C14.6,14 12,16 8.8,16 C5.6,16 3,14 3,11.3 C3,10.3 3.3,9.4 3.9,8.6 L1.6,8.6 Z" />
+                        <Ellipse Canvas.Left="5.3" Canvas.Top="8.1" Width="7" Height="6" Fill="#1E1E1E" />
+                        <Ellipse Canvas.Left="6.9" Canvas.Top="9.5" Width="3.8" Height="3.3" Fill="#4D8FD0" />
+                      </Canvas>
+                    </Viewbox>
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Margin="8,0,4,0" Classes="muted" Text="{Binding Detail}" />
+                </Grid>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter x:Name="OutlinerSplitter" Grid.Column="1" ResizeDirection="Columns" />
+
+      <!-- Tool views -->
+      <Panel Grid.Column="2">
+        <!-- Animations -->
+        <Grid x:Name="AnimationView" ColumnDefinitions="270,4,*">
+          <Border Grid.Column="0" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader">
+                <TextBlock Classes="panelTitle" Text="Property Browser" />
+              </Border>
+              <TextBox x:Name="PropertyFilterBox" DockPanel.Dock="Top" Classes="filter" PlaceholderText="Filter properties…" TextChanged="OnPropertyFilterChanged" />
+              <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="4">
+                <Button x:Name="BuildBlendButton" Grid.Column="0" Grid.Row="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Build .blend" IsEnabled="False" Click="OnBuildBlendClicked" />
+                <Button x:Name="OpenBlendButton" Grid.Column="1" Grid.Row="0" Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open in Blender" IsEnabled="False" Click="OnOpenBlendClicked" />
+                <Button x:Name="OpenSandboxButton" Grid.Column="0" Grid.Row="1" Margin="0,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open sandbox folder" IsEnabled="False" Click="OnOpenSandboxClicked"
+                        ToolTip.Tip="The weapon's working folder: game clip copies, Blender exports and backups" />
+                <Button x:Name="BlenderAddonButton" Grid.Column="1" Grid.Row="1" Margin="4,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Blender add-on…" Click="OnBlenderAddonClicked"
+                        ToolTip.Tip="Optional: install the Weapon Lab panel into your Blender so it is there when you open a .blend directly (Open in Blender always loads it)" />
+                <Button x:Name="ChecksButton" Grid.Column="0" Grid.Row="2" Margin="0,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Checks…" IsEnabled="False" Click="OnChecksClicked"
+                        ToolTip.Tip="Everything known to be wrong with this weapon, in plain words, with Show and Fix buttons: the model against the skeleton, the player-model hookup, the vdata model, the game's reload timing and the .blend" />
+                <Button x:Name="DeleteBlendButton" Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="4" Margin="0,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Delete .blend…" IsEnabled="False" Click="OnDeleteBlendClicked" Classes="danger"
+                        ToolTip.Tip="Delete the weapon's Blender file (asks first). Exports and the rest of the sandbox stay." />
+                <Button x:Name="VariationsButton" Grid.Column="1" Grid.Row="2" Margin="4,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Variations…" Click="OnVariationsClicked"
+                        ToolTip.Tip="Rare draws and inspects (a clip in a weighted choice) and a random reload between two clips: graph edits, delivered on your next push" />
+                <Button x:Name="MoveBlendButton" Grid.Column="0" Grid.Row="3" Margin="0,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Move .blend…" IsEnabled="False" Click="OnMoveBlendClicked"
+                        ToolTip.Tip="Move the weapon's Blender file (and its .blend1) to another folder; Weapon Lab and the add-on follow it. Close it in Blender first." />
+                <Button x:Name="ShowBlendButton" Grid.Column="1" Grid.Row="3" Margin="4,4,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Show .blend" IsEnabled="False" Click="OnShowBlendClicked"
+                        ToolTip.Tip="Show the weapon's Blender file in Explorer" />
+              </Grid>
+              <ScrollViewer>
+                <ItemsControl x:Name="PropertyList" Margin="2,0,2,6">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="app:PropertyGroup">
+                      <StackPanel>
+                        <TextBlock Classes="groupHeader" Text="{Binding Name}" />
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="app:PropertyRow">
+                              <Grid ColumnDefinitions="96,*" Margin="14,1,4,1">
+                                <TextBlock Grid.Column="0" Classes="muted" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" IsVisible="{Binding !HasToggle}" />
+                                <CheckBox Grid.Column="1" IsVisible="{Binding HasToggle}" IsChecked="{Binding IsChecked, Mode=OneWay}" MinWidth="0" Padding="4,0,0,0"
+                                          IsCheckedChanged="OnPropertyToggleChanged">
+                                  <TextBlock Text="{Binding Value}" TextWrapping="Wrap" />
+                                </CheckBox>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+
+          <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+          <Grid Grid.Column="2" RowDefinitions="*,4,280">
+          <!-- Viewport: the weapon model and the skeleton its clips drive. The same block moves into Anim Events when that tab is open. -->
+          <Panel x:Name="AnimationViewportHost">
+          <Border x:Name="ViewportPanel" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader" Padding="6,0">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock x:Name="ViewportTitle" Classes="panelTitle" VerticalAlignment="Center" Text="Viewport" TextTrimming="CharacterEllipsis" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <CheckBox x:Name="ViewportMeshToggle" IsChecked="True" Click="OnViewportToggled" ToolTip.Tip="Show the weapon model">
+                      <TextBlock Text="Model" />
+                    </CheckBox>
+                    <CheckBox x:Name="ViewportArmsToggle" IsChecked="True" Click="OnViewportToggled" ToolTip.Tip="Show the viewmodel arms: the sleeves and gloves picked in Build .blend, played by the clip's arm stream">
+                      <TextBlock Text="Arms" />
+                    </CheckBox>
+                    <CheckBox x:Name="ViewportBonesToggle" IsChecked="True" Click="OnViewportToggled" ToolTip.Tip="Show the skeleton the clips drive (new bones of a custom skeleton in amber, arm bones grey)">
+                      <TextBlock Text="Bones" />
+                    </CheckBox>
+                    <Button Content="Frame" Padding="8,0" Click="OnViewportFrameClicked" ToolTip.Tip="Fit the weapon in the view" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <TextBlock x:Name="ViewportCaption" DockPanel.Dock="Bottom" Classes="muted" FontSize="10" Margin="6,2" TextTrimming="CharacterEllipsis"
+                         Text="Left drag turns, right or middle drag pans, wheel zooms; click a joint to select its bone." />
+              <!-- Timeline: plays the clip selected in the outliner -->
+              <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="6,2,6,0">
+                <Button x:Name="ViewportStepBackButton" Width="28" Padding="0" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnViewportStepClicked" Tag="-1" Content="◀|" ToolTip.Tip="One frame back" />
+                <Button x:Name="ViewportPlayButton" Grid.Column="1" Width="34" Margin="2,0" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnViewportPlayClicked" ToolTip.Tip="Play or pause the clip (select a clip in the outliner)">
+                  <TextBlock x:Name="ViewportPlayGlyph" Text="▶" />
+                </Button>
+                <Button x:Name="ViewportStepForwardButton" Grid.Column="2" Width="28" Padding="0" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnViewportStepClicked" Tag="1" Content="|▶" ToolTip.Tip="One frame forward" />
+                <Panel Grid.Column="3" Margin="8,0">
+                  <app:TimelineMarks x:Name="ViewportEventMarks" Height="7" VerticalAlignment="Top" />
+                  <Slider x:Name="ViewportTimeline" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="OnViewportTimelineChanged" VerticalAlignment="Center" />
+                </Panel>
+                <TextBlock x:Name="ViewportFrameText" Grid.Column="4" Classes="muted" FontSize="11" VerticalAlignment="Center" MinWidth="110" Text="no clip" />
+                <ComboBox x:Name="ViewportSpeed" Grid.Column="5" SelectedIndex="2" Margin="6,0" SelectionChanged="OnViewportSpeedChanged" ToolTip.Tip="Playback speed">
+                  <ComboBoxItem Content="0.25×" />
+                  <ComboBoxItem Content="0.5×" />
+                  <ComboBoxItem Content="1×" />
+                  <ComboBoxItem Content="2×" />
+                </ComboBox>
+                <ComboBox x:Name="ViewportShells" Grid.Column="6" SelectedIndex="0" Margin="0,0,6,0" IsEnabled="False" SelectionChanged="OnViewportShellsChanged"
+                          ToolTip.Tip="Shell-by-shell reloads: play the intro, the loop once per shell, then the outro, as the game does. Needs the clip's loop (Anim Events).">
+                  <ComboBoxItem Content="Clip" />
+                  <ComboBoxItem Content="1 shell" />
+                  <ComboBoxItem Content="2 shells" />
+                  <ComboBoxItem Content="3 shells" />
+                  <ComboBoxItem Content="4 shells" />
+                  <ComboBoxItem Content="6 shells" />
+                  <ComboBoxItem Content="8 shells" />
+                </ComboBox>
+                <CheckBox x:Name="ViewportSoundToggle" Grid.Column="7" IsChecked="True" Margin="0,0,8,0" Click="OnViewportSoundToggled" ToolTip.Tip="Play the clip's sound events as playback passes them">
+                  <TextBlock Text="Sound" />
+                </CheckBox>
+                <CheckBox x:Name="ViewportExportedToggle" Grid.Column="8" IsChecked="True" Click="OnViewportExportedToggled" ToolTip.Tip="Play your Blender export of this clip; untick to compare with the original">
+                  <TextBlock Text="Your export" />
+                </CheckBox>
+              </Grid>
+              <Panel ClipToBounds="True">
+                <app:WeaponViewport x:Name="WeaponView" />
+                <Canvas x:Name="ViewportOverlay" IsHitTestVisible="False">
+                  <Border x:Name="ViewportBoneLabel" IsVisible="False" Background="#CC1B1B1F" CornerRadius="3" Padding="5,1">
+                    <TextBlock x:Name="ViewportBoneLabelText" FontSize="11" />
+                  </Border>
+                </Canvas>
+                <TextBlock x:Name="ViewportEmpty" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="muted" Text="Select a weapon in the outliner" IsHitTestVisible="False" />
+              </Panel>
+            </DockPanel>
+          </Border>
+          </Panel>
+
+          <GridSplitter Grid.Row="1" ResizeDirection="Rows" />
+
+          <Border Grid.Row="2" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader" Padding="2,0">
+                <Grid ColumnDefinitions="Auto,*">
+                  <TabStrip x:Name="ViewTabs" Classes="views" SelectedIndex="0" SelectionChanged="OnViewChanged">
+                    <TabStripItem Content="Events" />
+                    <TabStripItem Content="Tracks" />
+                    <TabStripItem x:Name="ExportsTab" Content="Exports" />
+                  </TabStrip>
+                  <TextBox x:Name="ViewFilterBox" Grid.Column="1" Classes="filter" PlaceholderText="Filter…" TextChanged="OnViewFilterChanged" />
+                </Grid>
+              </Border>
+
+              <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" Margin="4">
+                <Button x:Name="VerifyClipButton" Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Verify encoder on clip" IsEnabled="False" Click="OnVerifyClipClicked"
+                        ToolTip.Tip="No-op output is byte-identical, a full re-encode stays within tolerance, and a 10° bone edit leaves every other track exact." />
+                <Button x:Name="VerifyWeaponButton" Grid.Column="1" Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Verify encoder on weapon" IsEnabled="False" Click="OnVerifyWeaponClicked" />
+              </Grid>
+
+              <TextBlock x:Name="CenterTitle" DockPanel.Dock="Top" Margin="8,6" FontSize="15" FontWeight="SemiBold" Text="Select a weapon in the outliner" TextTrimming="CharacterEllipsis" />
+
+              <Panel>
+                <DockPanel x:Name="EventsView">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="70,80,90,*" Margin="14,0,0,2">
+                    <TextBlock Grid.Column="0" Classes="columnHeader" Text="Frame" />
+                    <TextBlock Grid.Column="1" Classes="columnHeader" Text="Time" />
+                    <TextBlock Grid.Column="2" Classes="columnHeader" Text="Kind" />
+                    <TextBlock Grid.Column="3" Classes="columnHeader" Text="Name" />
+                  </Grid>
+                  <ListBox x:Name="EventList">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="app:EventRow">
+                        <Grid ColumnDefinitions="70,80,90,*">
+                          <TextBlock Grid.Column="0" Text="{Binding Frame}" />
+                          <TextBlock Grid.Column="1" Text="{Binding Seconds}" />
+                          <TextBlock Grid.Column="2" Classes="muted" Text="{Binding Kind}" />
+                          <TextBlock Grid.Column="3" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </DockPanel>
+
+                <DockPanel x:Name="ExportsView" IsVisible="False">
+                  <TextBlock DockPanel.Dock="Top" Margin="14,0,0,6" Classes="muted" TextWrapping="Wrap"
+                             Text="Clips exported from Blender. Custom weapons deliver these when the profile is applied (Deliver tab)." />
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="180,110,*,Auto" Margin="14,0,0,2">
+                    <TextBlock Grid.Column="0" Classes="columnHeader" Text="Clip" />
+                    <TextBlock Grid.Column="1" Classes="columnHeader" Text="Exported" />
+                    <TextBlock Grid.Column="2" Classes="columnHeader" Text="Changes" />
+                  </Grid>
+                  <ListBox x:Name="ExportList">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="app:ExportRow">
+                        <Grid ColumnDefinitions="180,110,*,Auto" ToolTip.Tip="{Binding File}">
+                          <TextBlock Grid.Column="0" Text="{Binding Clip}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Time}" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Text="{Binding Changes}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <Button Grid.Column="3" Classes="danger" Content="Delete" Padding="8,1" Margin="8,0,4,0" Tag="{Binding Clip}" Click="OnDeleteExportClicked"
+                                  ToolTip.Tip="Delete this export: the clip counts as unedited again and is no longer delivered. Your .blend keeps its keys." />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </DockPanel>
+
+                <DockPanel x:Name="TracksView" IsVisible="False">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="70,40,200,200,*" Margin="14,0,0,2">
+                    <TextBlock Grid.Column="0" Classes="columnHeader" Text="Stream" />
+                    <TextBlock Grid.Column="1" Classes="columnHeader" Text="#" />
+                    <TextBlock Grid.Column="2" Classes="columnHeader" Text="Bone" />
+                    <TextBlock Grid.Column="3" Classes="columnHeader" Text="Parent" />
+                    <TextBlock Grid.Column="4" Classes="columnHeader" Text="Animated channels" />
+                  </Grid>
+                  <ListBox x:Name="TrackList">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="app:TrackRow">
+                        <Grid ColumnDefinitions="70,40,200,200,*">
+                          <TextBlock Grid.Column="0" Classes="muted" Text="{Binding Stream}" />
+                          <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Index}" />
+                          <TextBlock Grid.Column="2" Text="{Binding Bone}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="3" Classes="muted" Text="{Binding Parent}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="4" Text="{Binding Channels}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </DockPanel>
+              </Panel>
+            </DockPanel>
+          </Border>
+          </Grid>
+        </Grid>
+
+        <!-- VData (0.22): every block in one scroll on the left, the 3D view of the block in view in the middle; its info is on the right (above History) -->
+        <Grid x:Name="VDataPanel" ColumnDefinitions="470,4,*" IsVisible="False">
+          <Border Grid.Column="0" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader" Padding="6,2">
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Classes="panelTitle" VerticalAlignment="Center" Text="Jump to" />
+                  <ComboBox x:Name="VDataBlockCombo" Grid.Column="1" Margin="6,0,0,0" HorizontalAlignment="Stretch" MaxDropDownHeight="500" SelectionChanged="OnVDataBlockSelected"
+                            ToolTip.Tip="Jump to a block. The list below scrolls through every block; the one at the top drives the viewport and the info on the right." />
+                </Grid>
+              </Border>
+              <TextBlock DockPanel.Dock="Top" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="8,4,8,2"
+                         Text="A vdata block is an item the game expects: its buy-menu slot and the recoil pattern it inherits. Its anim class picks the animation slot it plays, and m_szWorldModel the model the viewport shows." />
+              <TextBox x:Name="VDataPropertyFilter" DockPanel.Dock="Top" Classes="filter" PlaceholderText="Filter every block, e.g. damage, recoil, speed" TextChanged="OnVDataPropertyFilterChanged" />
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="150,62,136,26,*" Margin="14,2,0,2">
+                <TextBlock Grid.Column="0" Classes="columnHeader" Text="Property" ToolTip.Tip="Hover a property for its raw key and description" />
+                <TextBlock Grid.Column="1" Classes="columnHeader" Text="CS2" />
+                <TextBlock Grid.Column="2" Classes="columnHeader" Text="Addon (edit)" ToolTip.Tip="Starts with the addon's values (its source file). Yellow: not saved to the addon yet. Green: changed from CS2 and the addon has it." />
+                <TextBlock Grid.Column="4" Classes="columnHeader" Text="From" />
+              </Grid>
+              <ListBox x:Name="VDataRowList">
+                <ListBox.DataTemplates>
+                  <DataTemplate x:DataType="app:VDataBlockRow">
+                    <Border Background="#262A30" CornerRadius="3" Padding="6,4" Margin="0,10,0,2">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding HasStatus}"
+                                 Fill="{Binding State, Converter={x:Static app:Converters.StateBrush}}" />
+                        <TextBlock FontWeight="SemiBold" FontSize="14" Text="{Binding Block}" VerticalAlignment="Center" />
+                        <TextBlock Classes="muted" Text="{Binding Label}" VerticalAlignment="Center" />
+                        <TextBlock Classes="muted" FontSize="11" Text="{Binding Summary}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                  <DataTemplate x:DataType="app:VDataGroupRow">
+                    <TextBlock Classes="groupHeader" Margin="0,6,0,2" Text="{Binding Name}" />
+                  </DataTemplate>
+                  <DataTemplate x:DataType="app:VDataEditRow">
+                    <Grid ColumnDefinitions="150,62,136,26,*" ToolTip.Tip="{Binding Tip}">
+                      <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                 FontWeight="{Binding IsModified, Converter={x:Static app:Converters.BoldWhenTrue}}" />
+                      <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="muted" Text="{Binding StockValue}" TextTrimming="CharacterEllipsis" />
+                      <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                        <TextBox Classes="filter" Margin="0" IsEnabled="{Binding IsEditable}" IsVisible="{Binding HasTextBox}" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 Foreground="{Binding ValueState, Converter={x:Static app:Converters.StateTextBrush}}" />
+                        <ComboBox IsEditable="True" IsVisible="{Binding HasChoices}" HorizontalAlignment="Stretch" MaxDropDownHeight="400"
+                                  ItemsSource="{Binding Choices}" SelectedItem="{Binding PickedValue, Mode=TwoWay}"
+                                  Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                  Foreground="{Binding ValueState, Converter={x:Static app:Converters.StateTextBrush}}"
+                                  ToolTip.Tip="Pick a value or type your own" />
+                        <TextBlock FontSize="10" Foreground="#E07070" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      </StackPanel>
+                      <Button Grid.Column="3" Content="↺" Padding="0" Width="24" Height="24" VerticalAlignment="Center" HorizontalContentAlignment="Center"
+                              IsVisible="{Binding CanResetToStock}" ToolTip.Tip="{Binding ResetTip}" Click="OnVDataResetValueClicked" />
+                      <TextBlock Grid.Column="4" VerticalAlignment="Center" Classes="muted" FontSize="11" Text="{Binding Source}" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.DataTemplates>
+              </ListBox>
+            </DockPanel>
+          </Border>
+
+          <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+          <Border Grid.Column="2" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader" Padding="6,2">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                  <TextBlock Classes="panelTitle" VerticalAlignment="Center" Text="Model" />
+                  <TextBlock x:Name="VDataModelText" Grid.Column="1" Margin="8,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="The block's m_szWorldModel, as the list has it" />
+                  <TextBlock Grid.Column="2" Classes="muted" VerticalAlignment="Center" Margin="0,0,6,0" Text="Clip" />
+                  <ComboBox x:Name="VDataClipCombo" Grid.Column="3" Width="220" MaxDropDownHeight="500" SelectionChanged="OnVDataClipSelected"
+                            ToolTip.Tip="A clip of the animation slot this block plays (its anim class)" />
+                </Grid>
+              </Border>
+              <Panel x:Name="VDataViewportHost" />
+            </DockPanel>
+          </Border>
+        </Grid>
+
+        <!-- Anim Events: one clip at a time, the viewport above its event timeline, the inspector on the right -->
+        <Grid x:Name="SoundsView" ColumnDefinitions="*,4,340" IsVisible="False">
+          <Grid Grid.Column="0" RowDefinitions="*,4,Auto">
+            <Panel x:Name="EventsViewportHost" />
+            <GridSplitter Grid.Row="1" ResizeDirection="Rows" />
+            <Border Grid.Row="2" Classes="panel">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Classes="panelHeader" Padding="6,2">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="SoundsTitle" Classes="panelTitle" VerticalAlignment="Center" Text="Select a weapon in the outliner" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                      <Button x:Name="AddSoundButton" Content="+ Sound" Padding="8,1" IsEnabled="False" Click="OnAddSoundClicked" ToolTip.Tip="Add a sound event at the playhead (or double-click the Sounds lane)" />
+                      <Button x:Name="AddGameplayButton" Content="+ Gameplay" Padding="8,1" IsEnabled="False" Click="OnAddGameplayClicked" ToolTip.Tip="Add a gameplay event at the playhead (or double-click the Gameplay lane)" />
+                      <Button x:Name="CopyEventsButton" Content="Copy from…" Padding="8,1" IsEnabled="False" Click="OnCopyEventsClicked" ToolTip.Tip="Copy events (and the loop sections) from another CS2 clip, e.g. the Nova's reload markers" />
+                      <Button x:Name="UndoEventsButton" Content="↶" Width="28" Padding="0" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnUndoEventsClicked" ToolTip.Tip="Undo (Ctrl+Z)" />
+                      <Button x:Name="RedoEventsButton" Content="↷" Width="28" Padding="0" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnRedoEventsClicked" ToolTip.Tip="Redo (Ctrl+Y)" />
+                      <CheckBox x:Name="LegacyClipsToggle" Margin="6,0,0,0" Click="OnLegacyClipsToggled" ToolTip.Tip="Show the _lgcy clips (CS2's legacy models) in the clip overview">
+                        <TextBlock Text="Legacy clips" />
+                      </CheckBox>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+                <TextBlock x:Name="EventsHint" DockPanel.Dock="Bottom" Classes="muted" FontSize="10" Margin="6,2" TextTrimming="CharacterEllipsis"
+                           Text="Click selects (Ctrl adds) · drag moves · drag a bar's end resizes · ←/→ nudge (Shift ×10) · Delete · Ctrl+D duplicate · Ctrl+Z undo · Space plays · double-click a lane adds" />
+                <Panel MinHeight="170">
+                  <app:EventTimeline x:Name="EventTimelineView" IsVisible="False" />
+                  <ListBox x:Name="EventClipList" IsVisible="False" SelectionChanged="OnEventClipPicked">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="app:EventClipRow">
+                        <Grid ColumnDefinitions="220,*,Auto">
+                          <TextBlock Grid.Column="0" Text="{Binding Clip}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Events}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="2" Foreground="#E0B050" Text="{Binding State}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Panel>
+              </DockPanel>
+            </Border>
+          </Grid>
+
+          <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+          <Border Grid.Column="2" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader">
+                <TextBlock Classes="panelTitle" Text="Inspector" />
+              </Border>
+              <TextBlock x:Name="EventsStatus" DockPanel.Dock="Bottom" Margin="8,4" FontSize="11" TextWrapping="Wrap" IsVisible="False" />
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="8,6" Spacing="12">
+                  <StackPanel x:Name="ClipInfoPanel" Spacing="4" />
+                  <StackPanel x:Name="EventEditorPanel" Spacing="6" />
+                  <StackPanel x:Name="ShellReloadPanel" Spacing="6" />
+                </StackPanel>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+        </Grid>
+
+        <!-- Graph -->
+        <Grid x:Name="GraphView" ColumnDefinitions="*,4,330" IsVisible="False">
+          <Border Grid.Column="0" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader" Padding="6,2">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                  <TextBlock Classes="panelTitle" VerticalAlignment="Center" Text="Graph" />
+                  <ComboBox x:Name="GraphCombo" Grid.Column="1" Width="300" Margin="6,0" SelectionChanged="OnGraphSelected"
+                            ToolTip.Tip="The graphs that play this weapon's clips; '+ak47' graphs are the weapon's own variation of a shared graph" />
+                  <TextBox x:Name="GraphSearchBox" Grid.Column="2" Classes="filter" VerticalAlignment="Center" PlaceholderText="Find a node: reload, idle, ATK0…" KeyDown="OnGraphSearchKeyDown" TextChanged="OnGraphSearchChanged" />
+                  <TextBlock Grid.Column="3" Classes="muted" VerticalAlignment="Center" Margin="10,0,4,0" Text="Zoom" />
+                  <Slider x:Name="GraphZoom" Grid.Column="4" Width="110" Minimum="0.4" Maximum="1.6" Value="1" ValueChanged="OnGraphZoomChanged" />
+                </Grid>
+              </Border>
+              <Border DockPanel.Dock="Top" Padding="8,4" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+                <DockPanel>
+                  <Button x:Name="GraphUpButton" DockPanel.Dock="Left" Content="◀ Up" IsEnabled="False" Click="OnGraphUpClicked" Margin="0,0,8,0"
+                          ToolTip.Tip="Back to the level that contains this one (Backspace)" />
+                  <WrapPanel x:Name="GraphBreadcrumb" VerticalAlignment="Center" />
+                </DockPanel>
+              </Border>
+              <ListBox x:Name="GraphSearchResults" DockPanel.Dock="Top" MaxHeight="160" IsVisible="False" SelectionChanged="OnGraphSearchResultSelected" />
+              <Border DockPanel.Dock="Bottom" Padding="8,4" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,1,0,0">
+                <WrapPanel x:Name="GraphLegend" />
+              </Border>
+              <TextBlock x:Name="GraphTitle" DockPanel.Dock="Top" Margin="8,4" Classes="muted" TextWrapping="Wrap" Text="Select a weapon in the outliner" />
+              <ScrollViewer x:Name="GraphScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#1B1B1C">
+                <LayoutTransformControl x:Name="GraphZoomHost" HorizontalAlignment="Left" VerticalAlignment="Top">
+                  <Canvas x:Name="GraphCanvas" Background="#1B1B1C" PointerPressed="OnGraphCanvasPressed" />
+                </LayoutTransformControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+
+          <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+          <Border Grid.Column="2" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader">
+                <TextBlock Classes="panelTitle" Text="Node" />
+              </Border>
+              <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,1,0,0">
+                <DockPanel>
+                  <Border DockPanel.Dock="Top" Classes="panelHeader">
+                    <TextBlock x:Name="GraphEditsHeader" Classes="panelTitle" Text="Profile edits in this graph" />
+                  </Border>
+                  <Button x:Name="GraphResetButton" DockPanel.Dock="Bottom" Margin="8,4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Content="Reset this graph's edits" IsEnabled="False" Click="OnGraphResetClicked" />
+                  <ListBox x:Name="GraphEditList" Height="150" SelectionChanged="OnGraphEditSelected" />
+                </DockPanel>
+              </Border>
+              <ScrollViewer>
+                <StackPanel x:Name="GraphInspector" Margin="8,6" Spacing="6" />
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+        </Grid>
+
+        <!-- Deliver -->
+        <Grid x:Name="DeliverView" ColumnDefinitions="*,4,300" IsVisible="False">
+          <Border Grid.Column="0" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader">
+                <TextBlock Classes="panelTitle" Text="Push pending work to the addon" />
+              </Border>
+              <StackPanel DockPanel.Dock="Top" Margin="10,8" Spacing="4">
+                <TextBlock x:Name="DeliverTitle" FontSize="15" FontWeight="SemiBold" Text="Pick a target addon in the status bar" />
+                <TextBlock Classes="muted" TextWrapping="Wrap"
+                           Text="Pushes the profile's pending work into the addon: edited clips go to animation/anims/custom/&lt;weapon&gt;/ and the graphs that play them are updated on top of the addon's current ones, so whatever it already has stays. Nothing is removed except by Set to CS2 default, and model copies earlier versions shipped that nothing uses. VData is saved from the VData tab only. Every touched file is backed up first." />
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+                  <Button x:Name="ReviewDeliveryButton" Content="Review" IsEnabled="False" Click="OnReviewDeliveryClicked" />
+                  <Button x:Name="DeliverButton" Content="Push to addon" IsEnabled="False" Click="OnDeliverClicked" />
+                  <Button x:Name="UndoDeliveryButton" Content="Undo last push" IsEnabled="False" Click="OnUndoDeliveryClicked" />
+                  <TextBlock Classes="muted" VerticalAlignment="Center" Margin="16,0,4,0" Text="View" />
+                  <RadioButton x:Name="DeliverTreeRadio" GroupName="DeliverView" Content="Tree" IsChecked="True" IsCheckedChanged="OnDeliverViewChanged" ToolTip.Tip="The reviewed delivery as a tree, coloured by what happens to each file" />
+                  <RadioButton x:Name="DeliverListRadio" GroupName="DeliverView" Content="List" IsCheckedChanged="OnDeliverViewChanged" />
+                  <CheckBox x:Name="DeliverShowLeftOut" Content="Show left out" IsVisible="False" Margin="12,0,0,0" IsCheckedChanged="OnDeliverShowLeftOutChanged"
+                            ToolTip.Tip="Weapons left out of pushes (unticked) that have nothing in this one are hidden. Show them to tick one back in." />
+                </StackPanel>
+                <WrapPanel x:Name="DeliverLegend" Margin="0,4,0,0" IsVisible="True" />
+              </StackPanel>
+              <Grid x:Name="PlanHeader" IsVisible="False" DockPanel.Dock="Top" ColumnDefinitions="90,*" Margin="14,4,0,2">
+                <TextBlock Grid.Column="0" Classes="columnHeader" Text="Kind" />
+                <TextBlock Grid.Column="1" Classes="columnHeader" Text="Details" />
+              </Grid>
+              <Panel>
+                <ListBox x:Name="PlanList" IsVisible="False">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="app:PlanRow">
+                      <Grid ColumnDefinitions="90,*,Auto">
+                        <TextBlock Grid.Column="0" Classes="muted" Text="{Binding Kind}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap"
+                                   Foreground="{Binding IsWarning, Converter={x:Static app:Converters.WarningBrush}}" />
+                        <Button Grid.Column="2" Content="Show" Padding="8,1" Margin="8,0,0,0" VerticalAlignment="Top" IsVisible="{Binding CanShow}"
+                                ToolTip.Tip="{Binding ShowTip}" Click="OnShowCheckClicked" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <TreeView x:Name="DeliveryTree" IsVisible="True">
+                  <TreeView.Styles>
+                    <Style Selector="TreeViewItem" x:DataType="app:DeliveryTreeNode">
+                      <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
+                    </Style>
+                  </TreeView.Styles>
+                  <TreeView.ItemTemplate>
+                    <TreeDataTemplate x:DataType="app:DeliveryTreeNode" ItemsSource="{Binding Children}">
+                      <StackPanel Orientation="Horizontal" Spacing="8" ToolTip.Tip="{Binding Tip}">
+                        <StackPanel.ContextMenu>
+                          <ContextMenu IsVisible="{Binding HasMenu}">
+                            <MenuItem Header="Copy asset path" Click="OnCopyDeliveryAssetPathClicked" IsVisible="{Binding HasAssetPath}"
+                                      ToolTip.Tip="The full resource path without _c, e.g. for ModelDoc's NmSkeletonReference Source File" />
+                            <MenuItem Header="Set to CS2 default…" Click="OnResetWeaponMenuClicked" IsVisible="{Binding IsWeaponRow}" />
+                          </ContextMenu>
+                        </StackPanel.ContextMenu>
+                        <CheckBox IsVisible="{Binding CanToggle}" IsChecked="{Binding IsIncluded, Mode=TwoWay}" MinWidth="0" Padding="0" VerticalAlignment="Center"
+                                  ToolTip.Tip="Commit: push this into the addon. Unticked items are left out of this push; the addon keeps whatever it already has." />
+                        <Border Background="{Binding Brush}" CornerRadius="2" Padding="4,0" VerticalAlignment="Center" IsVisible="{Binding Tag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <TextBlock Text="{Binding Tag}" FontSize="10" Foreground="#1B1B1C" />
+                        </Border>
+                        <TextBlock Text="{Binding Label}" Foreground="{Binding Brush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <Button Content="Show" Padding="8,0" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding CanShow}"
+                                ToolTip.Tip="{Binding ShowTip}" Click="OnShowCheckClicked" />
+                      </StackPanel>
+                    </TreeDataTemplate>
+                  </TreeView.ItemTemplate>
+                </TreeView>
+              </Panel>
+            </DockPanel>
+          </Border>
+
+          <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+          <Border Grid.Column="2" Classes="panel">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="panelHeader">
+                <TextBlock Classes="panelTitle" Text="Past applies" />
+              </Border>
+              <ListBox x:Name="DeliveryHistoryList">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="app:DeliveryRow">
+                    <StackPanel>
+                      <TextBlock FontSize="11" Text="{Binding Title}" />
+                      <TextBlock Classes="muted" FontSize="10" Text="{Binding Detail}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+        </Grid>
+      </Panel>
+
+      <GridSplitter Grid.Column="3" ResizeDirection="Columns" />
+
+      <!-- Skeleton (Animations tab) above History (the weapon's status, slot and build are in the Property Browser; commit is in the Deliver tree) -->
+      <Grid x:Name="RightColumn" Grid.Column="4" RowDefinitions="Auto,*">
+        <!-- VData (0.22): the block in view: what is changed and where it comes from, saving, and its class -->
+        <Border x:Name="VDataInfoPanel" Classes="panel" Margin="0,0,0,4" IsVisible="False">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="panelHeader">
+              <TextBlock x:Name="VDataTitle" Classes="panelTitle" Text="VData" TextTrimming="CharacterEllipsis" />
+            </Border>
+            <ScrollViewer>
+              <StackPanel Margin="8,6" Spacing="6">
+                <TextBlock x:Name="VDataSubtitle" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                <TextBlock x:Name="VDataInfoText" FontSize="11" TextWrapping="Wrap" />
+                <TextBlock Classes="groupHeader" Text="Addon weapons.vdata" />
+                <TextBlock x:Name="VDataAddonStatus" FontSize="11" TextWrapping="Wrap" Text="Pick a target addon in the status bar." />
+                <Button x:Name="VDataSaveButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save to addon source" IsEnabled="False" Click="OnVDataSaveClicked"
+                        ToolTip.Tip="Edits the addon's content scripts/weapons.vdata in place (only the changed values; formatting and comments stay). Backed up first. The game sees it once it is compiled." />
+                <Button x:Name="VDataCompileButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save and compile" IsEnabled="False" Click="OnVDataCompileClicked"
+                        ToolTip.Tip="Saves the source like above, then compiles it with the Workshop Tools resourcecompiler and checks the result." />
+                <Button x:Name="VDataRefreshButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Refresh from CS2" IsEnabled="False" Click="OnVDataRefreshClicked"
+                        ToolTip.Tip="Rebuilds the addon's weapons.vdata from the current CS2 data plus the profile's values. Backed up first." />
+                <Button x:Name="VDataResetBlockButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Reset block…" IsEnabled="False" Click="OnVDataResetBlockClicked"
+                        ToolTip.Tip="Discard this block's unsaved changes, or queue CS2's values for everything the addon changed. Nothing is written until you save." />
+                <TextBlock Classes="groupHeader" Text="Weapon class" />
+                <TextBlock x:Name="VDataClassText" TextWrapping="Wrap" Classes="muted" FontSize="11" Text="Scroll to a block." />
+                <Button x:Name="VDataClassButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Base on another weapon…" IsEnabled="False" Click="OnVDataClassClicked"
+                        ToolTip.Tip="Make this weapon take another weapon's type, animations, model, sounds or handling (e.g. a CZ75 that works like the PP-Bizon). Your single edits still apply on top." />
+                <TextBlock x:Name="VDataOverridesHeader" Classes="groupHeader" Text="Profile vdata edits" />
+                <ItemsControl x:Name="VDataOverrideList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="app:OverrideRow">
+                      <StackPanel Margin="0,1">
+                        <TextBlock FontSize="11" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="muted" FontSize="10" Text="{Binding Value}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+        <Border x:Name="SkeletonPanel" Classes="panel" Margin="0,0,0,4">
+          <StackPanel>
+            <Border Classes="panelHeader">
+              <TextBlock x:Name="SkeletonPanelTitle" Classes="panelTitle" Text="Skeleton" TextTrimming="CharacterEllipsis" />
+            </Border>
+            <StackPanel Margin="8,6" Spacing="6">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Ellipse x:Name="SkeletonStateDot" Width="9" Height="9" VerticalAlignment="Center" IsVisible="False" />
+                <TextBlock x:Name="SkeletonTabSummary" TextWrapping="Wrap" MaxWidth="250" FontSize="11" Text="Pick a weapon in the outliner." />
+              </StackPanel>
+              <TextBlock x:Name="SkeletonTabState" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+              <Button x:Name="SkeletonChangeButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Change skeleton…" IsEnabled="False" Click="OnChangeSkeletonClicked"
+                      ToolTip.Tip="CS2 default for this slot, the addon's own, one built from a model's bones, or a skeleton file. The clips move onto it right away; the next push ships it. The bones are under the weapon's Skeleton node in the outliner." />
+              <TextBlock x:Name="ViewportModelText" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+              <Button x:Name="ViewportModelButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Viewport gun model…" IsEnabled="False" Click="OnViewportModelClicked"
+                      ToolTip.Tip="The gun model the viewport (and the next Build .blend) shows: Default, or a compiled .vmdl_c. Preview only: the game uses the vdata's m_szWorldModel." />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Grid.Row="1" Classes="panel">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="panelHeader">
+              <TextBlock Classes="panelTitle" Text="History" />
+            </Border>
+            <ListBox x:Name="HistoryList">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="app:HistoryEntry">
+                  <Grid ColumnDefinitions="56,*">
+                    <TextBlock Grid.Column="0" Classes="muted" FontSize="10" VerticalAlignment="Top" Margin="0,1,0,0" Text="{Binding Time}" />
+                    <TextBlock Grid.Column="1" FontSize="11" Text="{Binding Message}" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </Border>
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>

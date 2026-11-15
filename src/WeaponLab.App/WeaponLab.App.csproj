@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>WeaponLab.App</RootNamespace>
+    <AssemblyName>CS2WeaponLab</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The exe's icon in Explorer and the taskbar; the window uses the same file. -->
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
+    <!-- The viewport passes matrices and a GL function pointer to OpenGL. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/app.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <!-- Plays clip sound events in the Anim Events timeline (Windows audio). -->
+    <PackageReference Include="NAudio.Core" />
+    <PackageReference Include="NAudio.WinMM" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WeaponLab.Core\WeaponLab.Core.csproj" />
+    <!-- Ships weaponlab.exe next to the app; the Blender add-on runs it to export clips. -->
+    <ProjectReference Include="..\WeaponLab.Cli\WeaponLab.Cli.csproj" />
+  </ItemGroup>
+</Project>
