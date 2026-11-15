@@ -22,9 +22,9 @@ public static partial class BlenderLocator
     [GeneratedRegex(@"Blender\s+(?<version>\d+\.\d+(\.\d+)?)(?<suffix>[^\r\n]*)")]
     private static partial Regex VersionLine();
 
-    public static BlenderInstall? Locate()
+    public static BlenderInstall? Locate(string? preferredExecutable = null)
     {
-        return Candidates()
+        return Candidates(preferredExecutable)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(File.Exists)
             .Select(Probe)

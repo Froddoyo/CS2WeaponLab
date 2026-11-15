@@ -21,6 +21,7 @@ public sealed class BlenderTests : IDisposable
     [Theory]
     [InlineData("Blender 5.2.3 LTS\r\n\tbuild date: 2026-10-22\r\n", "5.2.3", "5.2.3 LTS")]
     [InlineData("Blender 4.4.0\n", "4.4.0", "4.4.0")]
+    [InlineData("Blender 4.5.0\n", "4.5.0", "4.5.0")]
     [InlineData("Blender 3.6.5\n", "3.6.5", "3.6.5")]
     public void VersionIsParsedFromBlenderOutput(string output, string version, string text)
     {

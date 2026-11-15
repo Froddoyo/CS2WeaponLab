@@ -178,6 +178,16 @@ def clear_bones(bag, names):
         bag.fcurves.remove(curve)
 
 
+def new_curve(bag, data_path, index, group_name):
+    """Creates an F-curve in a named group using the Blender 4.4+ channelbag API."""
+    curve = bag.fcurves.new(data_path, index=index)
+    group = bag.groups.get(group_name)
+    if group is None:
+        group = bag.groups.new(group_name)
+    curve.group = group
+    return curve
+
+
 def key_channels(bag, bases):
     """Writes one linear key per frame for every bone's location, rotation and scale."""
     linear = bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["LINEAR"].value
@@ -198,7 +208,7 @@ def key_channels(bag, bases):
             for component in range(width):
                 series = np.asarray([row[component] for row in rows], dtype=np.float32)
                 coordinates = np.column_stack((np.arange(len(series)), series)).astype(np.float32).ravel()
-                curve = bag.fcurves.new('pose.bones[' + json.dumps(name) + '].' + prop, index=component, group_name=name)
+                curve = new_curve(bag, 'pose.bones[' + json.dumps(name) + '].' + prop, component, name)
                 curve.keyframe_points.add(len(series))
                 curve.keyframe_points.foreach_set("co", coordinates)
                 curve.keyframe_points.foreach_set("interpolation", np.full(len(series), linear, dtype=np.int32))
